@@ -1,96 +1,63 @@
-# DRY & SRP — Nghiên cứu và ví dụ C++17
+# DRY and SRP — Research Report and C++17 Examples
 
-Repository này lưu báo cáo Markdown và các chương trình C++ minh họa cho bài tập **DRY (Don't Repeat Yourself)** và **SRP (Single Responsibility Principle)**.
+This public repository contains an English research report and standalone C++17 examples for the coursework topic **“DRY & SRP — Applying the Principles Appropriately.”**
 
-> **Trạng thái:** bản triển khai học tập. `report.md` là bản nháp có thể chỉnh sửa; hãy đọc, kiểm tra và cá nhân hóa phần nhận xét trước khi dùng làm bài nộp.
+## Main documents
 
-## Nội dung
+- [Research report](report.md): definitions, practical examples, over-application, design trade-offs, personal design evaluation, and all five code-review scenarios.
+- [References](references.md): bibliographic details, links, access date, and a note describing how each source is used.
+- [Code-review decisions](src/code-review/decisions.md): a concise summary of the five scenarios.
 
-- [Báo cáo](report.md): khái niệm, ví dụ thực tế, lạm dụng nguyên tắc, đánh đổi và Code Review.
-- [Tài liệu tham khảo](references.md): nguồn đọc và ngày truy cập.
-- `src/dry/`: trùng lặp hợp lý, tái sử dụng logic và trừu tượng hóa quá mức.
-- `src/srp/`: lớp nhiều trách nhiệm, thiết kế sau tái cấu trúc và phân chia lớp quá mức.
-- [Đánh giá 5 tình huống Code Review](src/code-review/decisions.md).
-- `scripts/build-all.sh`: biên dịch tất cả ví dụ độc lập.
+## Repository structure
 
-## Cấu trúc thư mục
+- README.md
+- report.md
+- references.md
+- .gitignore
+- scripts/build-all.sh
+- .github/workflows/cpp.yml
+- src/dry/: four DRY examples
+- src/srp/: four SRP examples
+- src/code-review/decisions.md
 
-```text
-.
-├── README.md
-├── report.md
-├── references.md
-├── .gitignore
-├── scripts/
-│   └── build-all.sh
-└── src/
-    ├── dry/
-    │   ├── validation_before.cpp
-    │   ├── validation_after.cpp
-    │   ├── independent_rules.cpp
-    │   └── premature_abstraction.cpp
-    ├── srp/
-    │   ├── order_service_before.cpp
-    │   ├── order_service_after.cpp
-    │   ├── student_cohesive.cpp
-    │   └── over_split_student.cpp
-    └── code-review/
-        └── decisions.md
-```
+## Build and run
 
-## Yêu cầu
+Requirements: a C++17 compiler (g++ or clang++) and Bash.
 
-- C++17 trở lên.
-- Một trình biên dịch C++ như `g++` hoặc `clang++`.
-- Bash để chạy script build.
+From the repository root:
 
-## Biên dịch tất cả ví dụ
+    bash scripts/build-all.sh
 
-Tại thư mục gốc repository:
+The script compiles each .cpp file independently into build/, because every example contains its own main() function.
 
-```bash
-bash scripts/build-all.sh
-```
+Run an example:
 
-Các file được biên dịch độc lập vì mỗi file có hàm `main()`. Chương trình sau khi biên dịch nằm trong `build/`.
+    ./build/validation_before
+    ./build/validation_after
+    ./build/independent_rules
+    ./build/premature_abstraction
+    ./build/order_service_before
+    ./build/order_service_after
+    ./build/student_cohesive
+    ./build/over_split_student
 
-Chạy thử:
+## Example guide
 
-```bash
-./build/validation_before
-./build/validation_after
-./build/independent_rules
-./build/premature_abstraction
-./build/order_service_before
-./build/order_service_after
-./build/student_cohesive
-./build/over_split_student
-```
-
-Có thể biên dịch riêng từng ví dụ:
-
-```bash
-g++ -std=c++17 -Wall -Wextra -pedantic \
-    src/dry/validation_after.cpp -o validation_after
-./validation_after
-```
-
-## Cách đọc các ví dụ
-
-| Chủ đề | Trước / trường hợp cần xem | Sau / đối chiếu |
+| Topic | Example | Main point |
 |---|---|---|
-| DRY — logic cùng chính sách | `validation_before.cpp` | `validation_after.cpp` |
-| DRY — trùng công thức nhưng khác nghiệp vụ | `independent_rules.cpp` | Giữ riêng có chủ đích |
-| DRY — trừu tượng hóa quá sớm | `premature_abstraction.cpp` | So sánh với lời giải thích trong báo cáo |
-| SRP — nhiều lý do để thay đổi | `order_service_before.cpp` | `order_service_after.cpp` |
-| SRP — nhóm chức năng gắn kết | `student_cohesive.cpp` | Một lớp có nhiều phương thức liên quan |
-| SRP — chia lớp quá mức | `over_split_student.cpp` | So sánh với `student_cohesive.cpp` |
+| DRY — duplicated shared policy | validation_before.cpp | Same customer-validation knowledge appears twice |
+| DRY — extracted shared policy | validation_after.cpp | One validation function represents the common rule |
+| DRY — acceptable duplication | independent_rules.cpp | Similar arithmetic belongs to independent business policies |
+| DRY — premature abstraction | premature_abstraction.cpp | A generic policy framework may be excessive for a simple fixed calculation |
+| SRP — mixed responsibilities | order_service_before.cpp | Validation, calculation, persistence, and notification are combined |
+| SRP — separated responsibilities | order_service_after.cpp | Collaborators own distinct concerns; the service coordinates them |
+| SRP — cohesive class | student_cohesive.cpp | Several related methods can belong to one student-record responsibility |
+| SRP — excessive splitting | over_split_student.cpp | One class per simple getter/setter adds indirection without value |
 
-## Nguyên tắc đánh giá
+## Continuous integration
 
-Không đánh giá thiết kế chỉ bằng số dòng mã hoặc số lượng lớp. Hãy xem:
-1. Các đoạn mã có biểu diễn cùng một **kiến thức/chính sách** hay chỉ tình cờ giống cú pháp?
-2. Những phần nào có xu hướng thay đổi vì cùng một lý do?
-3. Tái sử dụng có làm xuất hiện phụ thuộc không mong muốn không?
-4. Lợi ích bảo trì có lớn hơn chi phí trừu tượng hóa và điều hướng mã không?
+GitHub Actions compiles and runs all C++ examples on pushes to main and on pull requests targeting main.
 
+## Important scope notes
+
+The report's code samples are educational demonstrations, not production implementations. The email check is simplified, and the order repository and email sender simulate their work with console output. Read the report's assumptions before reusing any sample in a real application.
