@@ -97,7 +97,7 @@ This report explains the purpose and practical application of both principles, e
 
 \end{abstract}
 
-\section{1. Introduction}
+\section{Introduction}
 
 Software rarely remains unchanged after its first implementation. Business policies evolve, users request new behavior, external services change, and defects reveal assumptions that were not understood at the beginning. A design that is easy to write today can become expensive to modify later when knowledge is scattered across the codebase or when unrelated responsibilities are concentrated in one component.
 
@@ -113,7 +113,7 @@ Two principles often used to address these problems are DRY and SRP:
 
 Both principles aim to make change safer and less expensive. However, neither should be treated as a mechanical rule. Code that looks similar may represent different business policies. A class with several methods may still have one coherent responsibility. Conversely, a design with very little repeated code and many small classes may be harder to understand than a simpler design.
 
-\subsection{1.1. Objectives}
+\subsection{Objectives}
 
 This report has four objectives:
 
@@ -129,17 +129,17 @@ This report has four objectives:
 
 \end{enumerate}
 
-\subsection{1.2. Scope and approach}
+\subsection{Scope and approach}
 
 The report uses the assignment brief as its structure and draws on established software-design references. Hunt and Thomas provide the foundational explanation of DRY as a principle about knowledge duplication \cite{thomas2019pragmatic}. Robert C. Martin explains SRP in terms of grouping things that change for the same reason and separating those that change for different reasons \cite{martin2010srp}. Martin Fowler provides a definition of refactoring as behavior-preserving structural change \cite{fowler2004refactoring}, and discusses why coupling must be controlled rather than eliminated indiscriminately \cite{fowler2001coupling}.
 
 The C++ files in the source directory are deliberately small enough to compile independently. They isolate a design idea rather than implement production-grade validation, persistence, email delivery, or student administration. For example, the customer email check is intentionally minimal; a real application would require a clearly specified validation policy and appropriate tests.
 
-\section{2. Fundamental Concepts}
+\section{Fundamental Concepts}
 
-\section{2.1. DRY: Don't Repeat Yourself}
+\section{DRY: Don't Repeat Yourself}
 
-\subsection{2.1.1. Meaning}
+\subsection{Meaning}
 
 DRY stands for \textbf{Don't Repeat Yourself}. In The Pragmatic Programmer, Andrew Hunt and David Thomas formulate the principle around the idea that each piece of knowledge should have one unambiguous, authoritative representation within a system \cite{thomas2019pragmatic}.
 
@@ -149,7 +149,7 @@ Consider a system in which two operations validate a customer according to the s
 
 By contrast, two functions may contain similar arithmetic while implementing different business rules. If those rules have different owners or change for different reasons, making them share one abstraction may create an unwanted dependency. The code may look duplicated without representing duplicated knowledge.
 
-\subsection{2.1.2. Problems DRY is intended to prevent}
+\subsection{Problems DRY is intended to prevent}
 
 Duplicated knowledge creates several maintenance risks:
 
@@ -169,7 +169,7 @@ Duplicated knowledge creates several maintenance risks:
 
 These risks matter because requirements are not stable. The original understanding of a rule may change, and the code must continue to express that updated understanding. Hunt and Thomas emphasize that maintenance is not restricted to the period after release; requirements and understanding can change throughout development \cite{thomas2019pragmatic}.
 
-\subsection{2.1.3. Forms of repetition in software}
+\subsection{Forms of repetition in software}
 
 Duplication can appear in more than one form:
 
@@ -192,7 +192,7 @@ Schema or interface duplication & The same data structure is manually defined in
 
 Not every form can or should be removed by creating a shared function. For example, client and server code may both need a representation of the same data contract because they run in different environments. In that situation, a shared schema or code-generation process may be more appropriate than forcing both sides to call the same function.
 
-\subsection{2.1.4. Why repeated logic becomes dangerous when requirements change}
+\subsection{Why repeated logic becomes dangerous when requirements change}
 
 Suppose a customer-registration function and a customer-update function both check that:
 
@@ -212,7 +212,7 @@ If the developer updates only the registration function, registration and update
 
 The core problem is not that the condition occupies several lines. The problem is that a single policy has multiple independently maintained representations.
 
-\subsection{2.1.5. Common techniques for reducing duplication}
+\subsection{Common techniques for reducing duplication}
 
 The appropriate technique depends on what is duplicated:
 
@@ -234,7 +234,7 @@ The appropriate technique depends on what is duplicated:
 
 The goal is not simply to reduce line count. The extracted abstraction should communicate the shared concept, remain easy to understand, and avoid connecting components that should evolve independently.
 
-\subsection{2.1.6. Example: duplicated customer validation}
+\subsection{Example: duplicated customer validation}
 
 The repository contains two implementations:
 
@@ -252,9 +252,9 @@ The example does not claim that checking for an at-sign is sufficient email vali
 
 \textbf{Design decision:} share the validation rule because the two operations represent the same policy, not merely because their code happens to look alike.
 
-\section{2.2. SRP: Single Responsibility Principle}
+\section{SRP: Single Responsibility Principle}
 
-\subsection{2.2.1. Meaning}
+\subsection{Meaning}
 
 SRP stands for \textbf{Single Responsibility Principle}. Robert C. Martin describes its central idea as: gather together things that change for the same reason and separate things that change for different reasons \cite{martin2010srp}.
 
@@ -264,7 +264,7 @@ For example, a component that contains business calculations, report formatting,
 
 SRP therefore concerns the organization of responsibilities and change boundaries, not the number of methods in a class.
 
-\subsection{2.2.2. What is a responsibility?}
+\subsection{What is a responsibility?}
 
 A responsibility is a coherent area of behavior or knowledge for which a component is accountable. It is often associated with a stakeholder, user group, policy, or technical concern that can request a change.
 
@@ -286,7 +286,7 @@ Examples include:
 
 A responsibility is not simply one verb or one method. For instance, a student-record component may need methods to update a student's name, add a grade, calculate an average, and determine academic standing. Those methods can form one coherent responsibility if they all maintain or expose the state and rules of a student record.
 
-\subsection{2.2.3. Meaning of "one reason to change"}
+\subsection{Meaning of "one reason to change"}
 
 The phrase does not mean a class can never be modified for more than one small code-level reason. It means that the class should represent one coherent responsibility rather than several independent concerns.
 
@@ -323,7 +323,7 @@ Notification & The email provider or message template changes \\
 
 When all of these concerns are implemented in one class, the class becomes a point where unrelated changes accumulate. Its callers may also become exposed to implementation changes that they do not need to know about.
 
-\subsection{2.2.4. How to recognize a class with unrelated responsibilities}
+\subsection{How to recognize a class with unrelated responsibilities}
 
 The following questions can reveal a possible SRP problem:
 
@@ -345,7 +345,7 @@ The following questions can reveal a possible SRP problem:
 
 These are diagnostic signals, not automatic proof. A class with many methods is not necessarily poorly designed, and a class with few methods is not necessarily well designed. The actual responsibilities and likely change patterns matter more than the method count.
 
-\subsection{2.2.5. How responsibilities can be separated}
+\subsection{How responsibilities can be separated}
 
 A class with multiple responsibilities can often be refactored into components with explicit roles:
 
@@ -367,7 +367,7 @@ The service may still call several methods, but its responsibility is now orches
 
 This separation can make each component easier to test or replace. However, it is useful only when the new boundaries represent meaningful responsibilities. Splitting code into classes that merely forward calls adds indirection without necessarily improving the design.
 
-\subsection{2.2.6. Example: refactoring an order service}
+\subsection{Example: refactoring an order service}
 
 The repository compares:
 
@@ -385,15 +385,15 @@ These examples simulate persistence and notification with console output. They d
 
 \textbf{Design decision:} split the independent concerns, but keep an orchestration service because coordinating the order-placement process is itself a coherent responsibility.
 
-\section{3. Advanced Analysis: Misuse, Over-Application, and Trade-Offs}
+\section{Advanced Analysis: Misuse, Over-Application, and Trade-Offs}
 
-\section{3.1. DRY: Is less duplicated code always better?}
+\section{DRY: Is less duplicated code always better?}
 
 No. A smaller amount of repeated text does not automatically mean a better design. The important question is whether the repeated code expresses the same underlying knowledge.
 
 Two code fragments may look alike for different reasons. A percentage calculation, for example, may be used by both a tax module and a customer-discount module. The arithmetic can be identical while the business policies are independent.
 
-\subsection{3.1.1. Shared code can create unwanted dependencies}
+\subsection{Shared code can create unwanted dependencies}
 
 A shared component is a dependency for every component that uses it. This is often desirable when the shared component represents a stable common rule. It can be harmful when it combines concerns that should evolve separately.
 
@@ -415,7 +415,7 @@ Potential problems include:
 
 Fowler explains that coupling is not something that can or should be eliminated completely. Modules must communicate to form a functioning system. The practical goal is to control unnecessary or harmful dependencies, particularly where a change in one component forces unrelated components to change \cite{fowler2001coupling}.
 
-\subsection{3.1.2. Premature abstraction}
+\subsection{Premature abstraction}
 
 \textbf{Premature abstraction} occurs when a developer creates a general-purpose interface or framework before the common behavior and its future requirements are understood well enough.
 
@@ -437,7 +437,7 @@ A typical sequence is:
 
 This can be worse than keeping two small, explicit implementations. The abstraction may save a few lines but introduce several concepts that every maintainer must understand.
 
-\subsection{3.1.3. Example of overusing DRY}
+\subsection{Example of overusing DRY}
 
 The file \path{src/dry/premature_abstraction.cpp} creates:
 
@@ -457,7 +457,7 @@ For this particular example, each policy only multiplies an amount by a fixed pe
 
 This does not mean that a policy interface is always wrong. It could be justified if policies are loaded dynamically, supplied by plugins, configured at runtime, or share a larger stable contract. The design is excessive only relative to the current requirements shown in this example.
 
-\subsection{3.1.4. When duplication can be acceptable}
+\subsection{When duplication can be acceptable}
 
 Keeping similar code separate can be safer when:
 
@@ -479,7 +479,7 @@ Keeping similar code separate can be safer when:
 
 This is sometimes described informally as preferring a little duplication over the wrong abstraction. It should not become an excuse for careless copying. Separate implementations should have clear names, explicit ownership, and appropriate tests.
 
-\subsection{3.1.5. Example: independent tax and discount policies}
+\subsection{Example: independent tax and discount policies}
 
 In \path{src/dry/independent_rules.cpp}, the tax calculator and loyalty-discount calculator both multiply an amount by 10 percent. The shared arithmetic is intentionally simple, but the two calculations represent separate business concepts.
 
@@ -489,11 +489,11 @@ Keeping the methods separate makes their meaning explicit and prevents a shared 
 
 \textbf{Trade-off:} a few repeated arithmetic characters are acceptable when they preserve the independence of two business rules. The decision should be revisited if the policies later become genuinely governed by one shared rule.
 
-\section{3.2. SRP: Does every responsibility require its own class?}
+\section{SRP: Does every responsibility require its own class?}
 
 No. SRP does not mean one class must contain only one method. A class can have several methods and still have one clear responsibility if those methods support the same coherent concept and tend to change together.
 
-\subsection{3.2.1. A class can have many methods and one responsibility}
+\subsection{A class can have many methods and one responsibility}
 
 Consider a StudentRecord class with methods to:
 
@@ -513,7 +513,7 @@ All of these methods relate to maintaining and interpreting a student's academic
 
 The relevant question is not "How many methods are in this class?" It is "Do these methods serve the same responsibility, or are they affected by unrelated change requests?"
 
-\subsection{3.2.2. Problems caused by too many small classes}
+\subsection{Problems caused by too many small classes}
 
 Over-applying SRP may create one class for every getter, setter, or tiny operation. This can produce:
 
@@ -533,13 +533,13 @@ Over-applying SRP may create one class for every getter, setter, or tiny operati
 
 A large number of classes is not automatically a sign of good modularity. A useful class boundary should represent a meaningful responsibility.
 
-\subsection{3.2.3. Interfaces and wrappers are not free}
+\subsection{Interfaces and wrappers are not free}
 
 Interfaces, adapters, wrappers, and intermediate layers are valuable when they provide a real benefit, such as substitutability, dependency inversion, isolation from an external system, or a stable contract.
 
 They are not automatically beneficial when used only to move a one-line getter into another file. Every layer introduces a concept and often a dependency. The benefit of an abstraction should be greater than the mental and maintenance cost it adds.
 
-\subsection{3.2.4. Cohesion and coupling}
+\subsection{Cohesion and coupling}
 
 Two useful design concepts help evaluate whether a class should be split:
 
@@ -563,7 +563,7 @@ A useful design often aims for:
 
 Fowler's discussion of coupling emphasizes that dependency is not inherently bad. The pattern and consequences of dependencies matter \cite{fowler2001coupling}.
 
-\subsection{3.2.5. Example: grouping student-record functions}
+\subsection{Example: grouping student-record functions}
 
 \path{src/srp/student_cohesive.cpp} groups student-record operations in one class. The class manages the record's name and grades and derives the average and academic standing from that information.
 
@@ -571,7 +571,7 @@ The example deliberately keeps console presentation in main() rather than making
 
 The class has several methods, but they contribute to one coherent responsibility. Splitting it into a separate class for each method would make the design harder to follow without providing a meaningful independent change boundary.
 
-\subsection{3.2.6. Example: excessive SRP decomposition}
+\subsection{Example: excessive SRP decomposition}
 
 \path{src/srp/over_split_student.cpp} defines separate classes for:
 
@@ -593,9 +593,9 @@ If age changes later require validation, authorization, or audit logging, those 
 
 \textbf{Trade-off:} keep related record operations together until there is a real reason for separate ownership, independent variation, or isolation.
 
-\section{4. Personal Design Evaluation and Decision-Making}
+\section{Personal Design Evaluation and Decision-Making}
 
-\subsection{4.1. Are DRY and SRP mandatory rules or guiding principles?}
+\subsection{Are DRY and SRP mandatory rules or guiding principles?}
 
 They are \textbf{guiding design principles}, not rules that should be followed blindly.
 
@@ -615,7 +615,7 @@ A literal interpretation can be harmful:
 
 A better interpretation is to avoid duplicated knowledge and unrelated reasons to change while keeping the design understandable.
 
-\subsection{4.2. How to decide whether refactoring is worthwhile}
+\subsection{How to decide whether refactoring is worthwhile}
 
 Refactoring is worthwhile when it improves the internal design enough to justify the change and its future maintenance cost.
 
@@ -645,7 +645,7 @@ Team comprehension & Will another developer understand where to make the next ch
 
 A refactoring should have a concrete expected benefit, such as removing inconsistent policy copies, isolating an external integration, or making a module easier to test. Refactoring solely to make a diagram look more object-oriented is not a sufficient reason.
 
-\subsection{4.3. What to consider before extracting shared code}
+\subsection{What to consider before extracting shared code}
 
 Before extracting a common function or module:
 
@@ -671,7 +671,7 @@ Before extracting a common function or module:
 
 A good shared abstraction represents a real commonality. It should not force separate business concepts into one interface merely because they currently use the same expression.
 
-\subsection{4.4. What to consider before splitting a class}
+\subsection{What to consider before splitting a class}
 
 Before dividing a class:
 
@@ -695,7 +695,7 @@ Before dividing a class:
 
 A class should be split when the new components have meaningful purposes and the separation reduces the impact of independent changes. A class should not be split merely because it contains multiple methods.
 
-\subsection{4.5. A situation in which I would deliberately avoid over-applying DRY or SRP}
+\subsection{A situation in which I would deliberately avoid over-applying DRY or SRP}
 
 I would keep two simple calculations separate if they currently use the same formula but represent independent business rules—for example, tax and loyalty discount rates.
 
@@ -705,11 +705,11 @@ Likewise, I would not create four classes for reading and writing a student's na
 
 These are deliberate decisions, not an argument against DRY or SRP. They apply the principles according to the meaning and expected evolution of the software.
 
-\section{5. Code Review: Evaluation of the Five Scenarios}
+\section{Code Review: Evaluation of the Five Scenarios}
 
 The assignment asks whether each situation is a violation, a potential problem, or acceptable. The decisions below are based on the context given. Where the scenario does not provide enough implementation detail, the conclusion is conditional rather than absolute.
 
-\subsection{5.1. Shared validation}
+\subsection{Shared validation}
 
 \textbf{Scenario:} Two operations contain the same customer-validation logic and follow the same business policy.
 
@@ -721,7 +721,7 @@ The common component should express the shared rule clearly. If one operation ha
 
 \textbf{Classification:} duplicated knowledge worth consolidating.
 
-\subsection{5.2. Similar calculations}
+\subsection{Similar calculations}
 
 \textbf{Scenario:} A tax module and a discount module currently contain the same formula, but their rules come from different business policies.
 
@@ -733,7 +733,7 @@ The modules may use a low-level mathematical utility if that utility is truly in
 
 \textbf{Classification:} acceptable duplication when it preserves independent business rules.
 
-\subsection{5.3. A Student class with many methods}
+\subsection{A Student class with many methods}
 
 \textbf{Scenario:} A Student class updates student information, calculates GPA, checks academic standing, and displays a summary.
 
@@ -747,7 +747,7 @@ A reasonable design is to keep the student data and closely related behavior tog
 
 \textbf{Classification:} potential SRP violation, depending on whether the methods belong to one cohesive responsibility.
 
-\subsection{5.4. Too many classes}
+\subsection{Too many classes}
 
 \textbf{Scenario:} A developer creates StudentNameGetter, StudentNameSetter, StudentAgeGetter, and StudentAgeSetter.
 
@@ -759,7 +759,7 @@ A student-record class can expose appropriate accessors and update operations. I
 
 \textbf{Classification:} over-application of SRP.
 
-\subsection{5.5. Order service}
+\subsection{Order service}
 
 \textbf{Scenario:} An OrderService validates an order, calculates the total, saves the order, and sends a confirmation email.
 
@@ -773,7 +773,7 @@ In a very small application, a separate class for every operation may be unneces
 
 \textbf{Classification:} likely multiple responsibilities; separation is justified when the boundaries represent real change axes.
 
-\subsection{5.6. Summary decision table}
+\subsection{Summary decision table}
 
 \begin{table}[htbp]
 \centering
@@ -791,11 +791,11 @@ In a very small application, a separate class for every operation may be unneces
 \end{tabularx}
 \end{table}
 
-\section{6. A Practical Decision Framework}
+\section{A Practical Decision Framework}
 
 The following framework turns the principles into a repeatable code-review process.
 
-\subsection{6.1. When considering DRY}
+\subsection{When considering DRY}
 
 Ask:
 
@@ -815,7 +815,7 @@ Ask:
 
 If the first two answers are yes and the abstraction is simple, sharing is likely useful. If the fragments only look alike and their policies change independently, keeping them separate may be safer.
 
-\subsection{6.2. When considering SRP}
+\subsection{When considering SRP}
 
 Ask:
 
@@ -837,7 +837,7 @@ Ask:
 
 A useful split creates components that can be understood and changed for distinct reasons. A useless split creates small wrappers with no independent meaning.
 
-\subsection{6.3. Safe refactoring sequence}
+\subsection{Safe refactoring sequence}
 
 A practical refactoring sequence is:
 
@@ -861,7 +861,7 @@ A practical refactoring sequence is:
 
 This sequence follows the behavior-preserving approach to refactoring described by Fowler \cite{fowler2004refactoring}.
 
-\section{7. Conclusion}
+\section{Conclusion}
 
 DRY and SRP address different but related design problems. DRY discourages maintaining the same knowledge in several places. SRP encourages grouping behavior according to coherent responsibilities and reasons to change. Both can improve maintainability when their underlying concepts are understood.
 
