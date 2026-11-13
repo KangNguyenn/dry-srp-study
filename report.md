@@ -1,250 +1,576 @@
-# Báo cáo: DRY và SRP — Sử dụng một cách hợp lý
+# DRY and SRP: Applying Software Design Principles with Judgment
 
-> **Trạng thái tài liệu:** bản nháp học tập dựa trên yêu cầu bài tập. Cần đọc lại mã nguồn, điều chỉnh cách diễn đạt và cá nhân hóa phần đánh giá trước khi nộp.  
-> **Ngôn ngữ mã nguồn:** C++17.
+**Coursework report**  
+**Language:** C++17 examples  
+**Date:** 13 November 2026
 
-## 1. Giới thiệu
+> **Scope note:** This report follows the supplied assignment brief. The code samples in this repository are small, self-contained teaching examples designed to make the design decisions visible. They are not claimed to be excerpts from a production system. The report distinguishes established definitions from the analysis and decisions made for these examples.
 
-Trong quá trình phát triển phần mềm, yêu cầu thường xuyên thay đổi. Một chương trình có thể đang chạy đúng nhưng vẫn khó bảo trì nếu cùng một quy tắc được viết ở nhiều nơi hoặc một lớp phải thay đổi vì nhiều nguyên nhân không liên quan.
+## Abstract
 
-DRY (*Don't Repeat Yourself*) và SRP (*Single Responsibility Principle*) là hai nguyên tắc giúp tổ chức mã nguồn để dễ hiểu và dễ thay đổi hơn. Tuy nhiên, chúng không phải mệnh lệnh phải làm theo một cách máy móc. Loại bỏ mọi đoạn mã trông giống nhau có thể tạo ra một abstraction phức tạp; tách mọi phương thức thành một lớp riêng có thể làm chương trình phân mảnh và khó theo dõi.
+DRY (Don't Repeat Yourself) and SRP (Single Responsibility Principle) are widely used principles for organizing maintainable software. DRY is concerned with avoiding duplicated knowledge, while SRP is concerned with grouping behavior according to the reasons that cause it to change. Neither principle means that all similar-looking code must be shared or that every method must belong to a separate class. Applied without context, DRY can produce premature abstractions and unwanted dependencies; SRP can produce excessive classes, interfaces, wrappers, and indirection.
 
-Báo cáo này trình bày ý nghĩa cơ bản của DRY và SRP, phân tích những tình huống áp dụng quá mức, rồi đánh giá năm tình huống Code Review trong đề bài. Các ví dụ C++ tương ứng được lưu trong thư mục `src/`.
+This report explains the purpose and practical application of both principles, examines situations in which their strict or superficial application can make a design worse, and evaluates five code-review scenarios. The examples use C++17 to compare duplicated and shared validation, independent business rules, an over-generalized percentage abstraction, a multi-purpose order service, a cohesive student record, and excessive getter/setter classes. The central conclusion is that design quality should be judged by the stability of the concepts being represented, the reasons components change, cohesion, coupling, and the cost of future maintenance—not by the number of duplicated lines or classes.
 
-## 2. Nghiên cứu cơ bản: DRY và SRP
+---
 
-### 2.1. DRY là gì?
+## 1. Introduction
 
-DRY là viết tắt của *Don't Repeat Yourself*. Theo cách diễn đạt trong *The Pragmatic Programmer*, mỗi phần kiến thức trong hệ thống nên có một biểu diễn có thẩm quyền, rõ ràng và không mơ hồ [1]. Vì vậy, DRY không chỉ có nghĩa là không sao chép và dán các dòng mã. Trọng tâm của nguyên tắc là tránh việc cùng một kiến thức, ý định hoặc quy tắc phải được duy trì ở nhiều nơi.
+Software rarely remains unchanged after its first implementation. Business policies evolve, users request new behavior, external services change, and defects reveal assumptions that were not understood at the beginning. A design that is easy to write today can become expensive to modify later when knowledge is scattered across the codebase or when unrelated responsibilities are concentrated in one component.
 
-Ví dụ, nếu hai chức năng cùng kiểm tra một chính sách hợp lệ của khách hàng nhưng mỗi chức năng tự viết một bản kiểm tra riêng, chúng đang lưu giữ cùng một quy tắc ở hai vị trí. Khi chính sách thay đổi, lập trình viên phải tìm và sửa cả hai nơi. Nếu chỉ sửa một nơi, hai chức năng có thể đưa ra kết quả khác nhau dù đáng lẽ phải tuân theo cùng một chính sách.
+Two principles often used to address these problems are DRY and SRP:
 
-### 2.2. Những dạng lặp lại có thể xuất hiện
+- **DRY** asks developers to avoid maintaining multiple, potentially inconsistent representations of the same knowledge.
+- **SRP** asks developers to organize behavior so that a component has one coherent responsibility, or one principal reason to change.
 
-Một số dạng thường gặp:
+Both principles aim to make change safer and less expensive. However, neither should be treated as a mechanical rule. Code that looks similar may represent different business policies. A class with several methods may still have one coherent responsibility. Conversely, a design with very little repeated code and many small classes may be harder to understand than a simpler design.
 
-- **Lặp mã nguồn:** cùng một đoạn kiểm tra, tính toán hoặc xử lý lỗi xuất hiện ở nhiều hàm.
-- **Lặp quy tắc nghiệp vụ:** một chính sách như điều kiện hợp lệ, mức phí hoặc giới hạn được định nghĩa ở nhiều module.
-- **Lặp dữ liệu/cấu hình:** cùng một giá trị quan trọng được khai báo ở nhiều nơi và có nguy cơ không đồng bộ.
-- **Lặp cấu trúc hoặc quy trình:** nhiều phần của chương trình phải thực hiện cùng một chuỗi thao tác.
-- **Lặp tài liệu:** hướng dẫn hoặc mô tả một quy tắc được sao chép ở nhiều tài liệu, sau đó chỉ một bản được cập nhật.
+### 1.1. Objectives
 
-Không phải mọi đoạn mã có hình thức giống nhau đều là lặp lại cùng một kiến thức. Hai phép tính có cùng công thức tại thời điểm hiện tại có thể đại diện cho hai chính sách độc lập. Vì vậy, phải xem xét ý nghĩa và nguyên nhân thay đổi trước khi hợp nhất chúng.
+This report has four objectives:
 
-### 2.3. Vì sao lặp logic gây khó khăn khi yêu cầu thay đổi?
+1. Explain the basic meaning and purpose of DRY and SRP.
+2. Demonstrate how the principles can improve design problems through representative C++ examples.
+3. Analyze over-application, premature abstraction, cohesion, coupling, and the trade-offs involved in refactoring.
+4. Make reasoned decisions about five code-review situations instead of automatically refactoring every apparent violation.
 
-Giả sử chương trình có hai chức năng đăng ký và cập nhật khách hàng. Cả hai đều kiểm tra tên không được để trống và email phải chứa ký tự `@`. Nếu chính sách email sau này thay đổi, lập trình viên phải nhớ cập nhật hai đoạn kiểm tra.
+### 1.2. Scope and approach
 
-Vấn đề không chỉ là tốn thêm thao tác. Nó còn tạo ra các rủi ro:
+The report uses the assignment brief as its structure and draws on established software-design references. Hunt and Thomas provide the foundational explanation of DRY as a principle about knowledge duplication [1]. Robert C. Martin explains SRP in terms of grouping things that change for the same reason and separating those that change for different reasons [2]. Martin Fowler provides a definition of refactoring as behavior-preserving structural change [3], and discusses why coupling must be controlled rather than eliminated indiscriminately [4].
 
-1. Một bản sao được sửa nhưng bản còn lại bị bỏ sót.
-2. Hai bản sao dần có hành vi khác nhau mà không có chủ đích.
-3. Người bảo trì phải tìm kiếm trên nhiều vị trí để hiểu một quy tắc duy nhất.
-4. Kiểm thử phải bảo đảm nhiều bản triển khai vẫn đồng nhất.
+The C++ files in the source directory are deliberately small enough to compile independently. They isolate a design idea rather than implement production-grade validation, persistence, email delivery, or student administration. For example, the customer email check is intentionally minimal; a real application would require a clearly specified validation policy and appropriate tests.
 
-### 2.4. Những cách giảm sự lặp lại
+---
 
-Có thể lựa chọn cách xử lý tùy loại kiến thức:
+## 2. Fundamental Concepts
 
-- Đưa logic ổn định, được dùng nhiều nơi vào một hàm có tên rõ nghĩa.
-- Đóng gói một chính sách nghiệp vụ dùng chung vào một thành phần có trách nhiệm phù hợp.
-- Đưa giá trị cấu hình chung về một nguồn cấu hình có thẩm quyền.
-- Dùng kiểu dữ liệu hoặc schema chung khi các module thực sự chia sẻ cùng một mô hình.
-- Sinh mã hoặc tài liệu từ một nguồn dữ liệu duy nhất khi có nhu cầu phù hợp.
-- Bổ sung kiểm thử để phát hiện các bản triển khai không còn nhất quán.
+## 2.1. DRY: Don't Repeat Yourself
 
-Không nên tạo abstraction chỉ để giảm số dòng. Thành phần dùng chung cần có tên diễn đạt đúng ý nghĩa và ranh giới thay đổi hợp lý.
+### 2.1.1. Meaning
 
-### 2.5. Ví dụ DRY: kiểm tra khách hàng bị lặp
+DRY stands for **Don't Repeat Yourself**. In The Pragmatic Programmer, Andrew Hunt and David Thomas formulate the principle around the idea that each piece of knowledge should have one unambiguous, authoritative representation within a system [1].
 
-Trong [`validation_before.cpp`](src/dry/validation_before.cpp), hai thao tác đăng ký và cập nhật chứa cùng một điều kiện kiểm tra. Phiên bản [`validation_after.cpp`](src/dry/validation_after.cpp) đưa điều kiện đó về hàm `isValidCustomer()`, sau đó cả hai thao tác gọi chung.
+This definition is more precise than the common interpretation that programmers should never write the same lines twice. DRY is not primarily a rule about visual similarity. It is a rule about the duplication of **knowledge, intent, or policy**.
 
-Thiết kế sau tốt hơn trong bối cảnh hai thao tác thực sự tuân theo cùng một chính sách khách hàng. Khi chính sách đổi, chỉ cần sửa một nơi. Hàm dùng chung cũng có thể được kiểm thử độc lập.
+Consider a system in which two operations validate a customer according to the same business policy. If each operation independently implements the same rules, the system stores one policy in two places. A future change to that policy must be applied consistently to both copies. If one copy is missed, the operations no longer agree about what makes a customer valid.
 
-## 3. SRP — Nguyên tắc đơn nhiệm
+By contrast, two functions may contain similar arithmetic while implementing different business rules. If those rules have different owners or change for different reasons, making them share one abstraction may create an unwanted dependency. The code may look duplicated without representing duplicated knowledge.
 
-### 3.1. SRP là gì?
+### 2.1.2. Problems DRY is intended to prevent
 
-SRP là viết tắt của *Single Responsibility Principle*. Robert C. Martin diễn đạt ý tưởng cốt lõi là: tập hợp những thứ thay đổi vì cùng một lý do và tách riêng những thứ thay đổi vì các lý do khác nhau [2].
+Duplicated knowledge creates several maintenance risks:
 
-Cụm từ thường được dùng để giải thích SRP là một lớp chỉ nên có **một lý do để thay đổi** (*one reason to change*). Điều này không có nghĩa một lớp chỉ được viết một phương thức. Nó có nghĩa những hành vi trong lớp nên thuộc về một trách nhiệm có tính gắn kết, thay vì tập hợp các công việc độc lập chỉ vì chúng cùng thao tác trên một đối tượng dữ liệu.
+1. **Inconsistent updates.** A developer changes one copy but forgets another.
+2. **Behavioral drift.** Initially identical implementations gradually acquire different edge cases or error handling.
+3. **Higher change cost.** A developer must locate every representation of a rule before safely modifying it.
+4. **More testing work.** Multiple implementations of one policy must be checked for consistency.
+5. **Unclear authority.** It becomes difficult to determine which copy represents the current requirement.
 
-### 3.2. Trách nhiệm của lớp hoặc module là gì?
+These risks matter because requirements are not stable. The original understanding of a rule may change, and the code must continue to express that updated understanding. Hunt and Thomas emphasize that maintenance is not restricted to the period after release; requirements and understanding can change throughout development [1].
 
-Trách nhiệm là nhóm hành vi và quy tắc mà lớp/module chịu trách nhiệm duy trì. Có thể nhận biết trách nhiệm thông qua câu hỏi: yêu cầu từ đâu có thể khiến thành phần này phải thay đổi?
+### 2.1.3. Forms of repetition in software
 
-Ví dụ, một lớp `OrderService` vừa kiểm tra quy tắc đặt hàng, vừa tính tiền, vừa lưu cơ sở dữ liệu, vừa gửi email. Những công việc đó có thể thay đổi vì các nguyên nhân khác nhau:
+Duplication can appear in more than one form:
 
-- Chính sách đặt hàng thay đổi.
-- Cách tính giá hoặc khuyến mãi thay đổi.
-- Cấu trúc cơ sở dữ liệu thay đổi.
-- Mẫu email hoặc nhà cung cấp gửi thư thay đổi.
+| Form of duplication | Example | Possible consequence |
+|---|---|---|
+| Source-code duplication | The same validation condition appears in two functions | One implementation may be updated while the other is missed |
+| Business-rule duplication | The same eligibility rule is independently encoded in multiple modules | Modules can disagree about a single policy |
+| Data or configuration duplication | A timeout, tax rate, or status mapping is copied into several files | Values can become inconsistent |
+| Process duplication | Several services independently implement the same required sequence | A process change must be repeated and coordinated |
+| Documentation duplication | The same configuration rule is explained in multiple documents | Documentation becomes contradictory |
+| Schema or interface duplication | The same data structure is manually defined in multiple systems | Changes to the structure must be synchronized |
 
-Khi tất cả nằm trong một lớp, thay đổi ở một mảng có thể khiến lớp phải sửa và có thể ảnh hưởng đến các mảng còn lại.
+Not every form can or should be removed by creating a shared function. For example, client and server code may both need a representation of the same data contract because they run in different environments. In that situation, a shared schema or code-generation process may be more appropriate than forcing both sides to call the same function.
 
-### 3.3. Dấu hiệu một lớp có thể đang vi phạm SRP
+### 2.1.4. Why repeated logic becomes dangerous when requirements change
 
-Một lớp đáng được xem xét khi:
+Suppose a customer-registration function and a customer-update function both check that:
+- the customer's name is not empty;
+- the email field is not empty; and
+- the email contains an at-sign.
 
-- Nó phục vụ nhiều nhóm yêu cầu hoặc chính sách khác nhau.
-- Nó trộn lẫn nghiệp vụ, lưu trữ dữ liệu, giao tiếp mạng và trình bày.
-- Một thay đổi nhỏ ở một chức năng khiến nhiều chức năng không liên quan phải kiểm thử lại.
-- Tên lớp quá chung chung nhưng chứa nhiều nhóm phương thức ít liên quan.
-- Các phương thức có thể được tách thành các nhóm thay đổi độc lập mà không làm mất ý nghĩa của mô hình.
+At first, the duplicated logic produces the same result. Later, the project changes its policy—for example, it introduces a centralized email-validation library or changes which customer fields are mandatory.
 
-Đây là dấu hiệu để xem xét, không phải bằng chứng tự động. Cần xem bối cảnh và cách thành phần được sử dụng.
+If the developer updates only the registration function, registration and update no longer enforce the same policy. This inconsistency may lead to confusing user experiences and invalid data entering the system through one operation.
 
-### 3.4. Cách tách trách nhiệm
+The core problem is not that the condition occupies several lines. The problem is that a single policy has multiple independently maintained representations.
 
-Có thể tách theo các nguyên nhân thay đổi:
+### 2.1.5. Common techniques for reducing duplication
 
-- Bộ kiểm tra chịu trách nhiệm xác định đơn hàng có hợp lệ không.
-- Bộ tính toán chịu trách nhiệm tính tổng tiền.
-- Repository chịu trách nhiệm lưu và truy xuất dữ liệu.
-- Thành phần thông báo chịu trách nhiệm gửi email.
-- Service ở tầng điều phối có thể gọi các thành phần trên theo đúng trình tự.
+The appropriate technique depends on what is duplicated:
 
-Sau khi tách, lớp điều phối vẫn có thể gọi nhiều phương thức. Điều đó không tự động vi phạm SRP, bởi trách nhiệm của nó có thể là điều phối quy trình đặt hàng.
+- **Extract a function.** Use this when the same small algorithm or condition is needed in multiple places and has a meaningful name.
+- **Create a policy or domain component.** Use this when several operations must follow the same business rule.
+- **Centralize configuration.** Store a shared setting in one authoritative configuration source rather than copying its value into several modules.
+- **Use a schema or code generator.** Use this when multiple representations must be produced from one data definition.
+- **Share tests or test data.** Common test cases can help verify that multiple entry points implement the same contract.
+- **Generate documentation where appropriate.** When the same information must appear in several formats, generating those formats from a maintained source can reduce manual synchronization.
 
-### 3.5. Ví dụ SRP: OrderService
+The goal is not simply to reduce line count. The extracted abstraction should communicate the shared concept, remain easy to understand, and avoid connecting components that should evolve independently.
 
-Trong [`order_service_before.cpp`](src/srp/order_service_before.cpp), một lớp vừa xác thực, tính tổng tiền, lưu đơn hàng và gửi xác nhận. Trong [`order_service_after.cpp`](src/srp/order_service_after.cpp), các công việc được chuyển sang `OrderValidator`, `OrderCalculator`, `OrderRepository` và `ConfirmationSender`.
+### 2.1.6. Example: duplicated customer validation
 
-Lớp `OrderService` vẫn tồn tại, nhưng nó chỉ điều phối quy trình. Thiết kế này có ích khi các phần trên có khả năng thay đổi độc lập hoặc cần được kiểm thử, thay thế riêng. Với chương trình cực nhỏ hoặc các phần không có khả năng thay đổi độc lập, việc tách đầy đủ có thể không đáng với chi phí bổ sung.
+The repository contains two implementations:
 
-## 4. Phân tích nâng cao: lạm dụng và đánh đổi
+- [validation_before.cpp](src/dry/validation_before.cpp) duplicates the same validation condition in registerCustomer() and updateCustomer().
+- [validation_after.cpp](src/dry/validation_after.cpp) extracts the shared policy into isValidCustomer().
 
-### 4.1. DRY: ít mã trùng lặp hơn có luôn tốt hơn?
+The second version is preferable in this scenario because both operations intentionally enforce the same customer policy. If the policy changes, the shared function can be updated once. It can also be tested independently.
 
-**Không.** Số dòng mã trùng nhau không phải thước đo duy nhất của chất lượng thiết kế. DRY hướng đến việc không duy trì cùng một kiến thức ở nhiều nơi; nó không bắt buộc mọi biểu thức giống nhau phải được đặt trong cùng một hàm.
+The example does not claim that checking for an at-sign is sufficient email validation. It uses a deliberately simple condition so that the design issue is visible. A real project should define validation requirements carefully and test them against the cases the product actually supports.
 
-Cần phân biệt hai trường hợp:
+**Design decision:** share the validation rule because the two operations represent the same policy, not merely because their code happens to look alike.
 
-- Hai đoạn mã cùng thực thi một chính sách nghiệp vụ: thay đổi chính sách cần được phản ánh đồng thời ở mọi nơi. Đây là ứng viên tốt cho logic dùng chung.
-- Hai đoạn mã có cú pháp hoặc công thức giống nhau nhưng thuộc hai chính sách khác nhau: chúng có thể thay đổi độc lập và nên được giữ riêng.
+---
 
-Ví dụ, mô-đun thuế và mô-đun giảm giá khách hàng thân thiết hiện cùng nhân số tiền với 10%. Tuy vậy, thuế thuộc chính sách thuế, còn giảm giá thuộc chính sách kinh doanh. Khi thuế thay đổi, không có lý do tự động nào buộc mức giảm giá thay đổi theo. [`independent_rules.cpp`](src/dry/independent_rules.cpp) giữ hai phép tính riêng để thể hiện sự khác nhau về ý nghĩa đó.
+## 2.2. SRP: Single Responsibility Principle
 
-### 4.2. Lạm dụng DRY và Premature Abstraction
+### 2.2.1. Meaning
 
-*Premature Abstraction* là tạo ra một cấu trúc tổng quát trước khi hiểu rõ các trường hợp sử dụng thực tế và điểm chung ổn định của chúng. Lập trình viên có thể nhìn thấy hai đoạn mã hơi giống nhau rồi xây dựng một framework, nhiều interface hoặc nhiều tham số để dùng chung.
+SRP stands for **Single Responsibility Principle**. Robert C. Martin describes its central idea as: gather together things that change for the same reason and separate things that change for different reasons [2].
 
-Việc này có thể tạo ra các vấn đề:
+The phrase **one reason to change** is a practical way to express this idea. A class or module should not be forced to change because of several unrelated sources of requirements.
 
-1. **Khó đọc:** người đọc phải hiểu framework trước khi hiểu phép tính đơn giản.
-2. **Tăng coupling:** những thành phần vốn độc lập bị buộc phải dùng chung một abstraction.
-3. **Khó sửa:** một thay đổi cục bộ có thể yêu cầu sửa abstraction tổng quát và các nơi đang sử dụng nó.
-4. **Tăng chi phí bảo trì:** số lớp, interface, factory và cấu hình tăng lên nhưng lợi ích tái sử dụng không tương xứng.
+For example, a component that contains business calculations, report formatting, and database persistence may be affected by three independent groups of requests. A change in the database schema should not normally require modifying the business-calculation logic. Likewise, changing the report layout should not require changing how business rules are calculated.
 
-[`premature_abstraction.cpp`](src/dry/premature_abstraction.cpp) minh họa một framework nhiều tầng chỉ để thực hiện phép nhân với một tỷ lệ cố định. Ví dụ này không chứng minh mọi framework đều xấu; nó cho thấy abstraction cần giải quyết một nhu cầu thật, không chỉ tồn tại để loại bỏ vài dòng mã.
+SRP therefore concerns the organization of responsibilities and change boundaries, not the number of methods in a class.
 
-### 4.3. Khi nào có thể chấp nhận trùng lặp?
+### 2.2.2. What is a responsibility?
 
-Có thể giữ các đoạn mã riêng khi:
+A responsibility is a coherent area of behavior or knowledge for which a component is accountable. It is often associated with a stakeholder, user group, policy, or technical concern that can request a change.
 
-- Chúng thuộc hai chính sách hoặc hai nhóm nghiệp vụ có chủ sở hữu khác nhau.
-- Chúng dự kiến thay đổi độc lập.
-- Việc tạo abstraction đòi hỏi nhiều tham số, nhánh điều kiện hoặc tên khó hiểu.
-- Phần trùng lặp rất nhỏ, ổn định và chi phí điều hướng sang thành phần dùng chung cao hơn lợi ích.
-- Chưa có đủ thông tin để khẳng định hai đoạn mã sẽ tiếp tục cùng ý nghĩa trong tương lai.
+Examples include:
+- calculating an order total according to pricing rules;
+- storing and retrieving orders;
+- sending an order-confirmation message;
+- validating an order against business constraints; and
+- formatting a student report.
 
-Đây không phải giấy phép để sao chép mã tùy tiện. Khi giữ trùng lặp, nên ghi tên hàm và tên biến thể hiện rõ mục đích riêng, đồng thời kiểm thử từng chính sách.
+A responsibility is not simply one verb or one method. For instance, a student-record component may need methods to update a student's name, add a grade, calculate an average, and determine academic standing. Those methods can form one coherent responsibility if they all maintain or expose the state and rules of a student record.
 
-### 4.4. SRP: mỗi trách nhiệm có cần một lớp riêng?
+### 2.2.3. Meaning of "one reason to change"
 
-**Không.** SRP không quy định một lớp chỉ có một phương thức. Một lớp có thể có nhiều phương thức nếu chúng phục vụ một trách nhiệm rõ ràng và có xu hướng thay đổi cùng nhau.
+The phrase does not mean a class can never be modified for more than one small code-level reason. It means that the class should represent one coherent responsibility rather than several independent concerns.
 
-Ví dụ, một lớp `StudentRecord` có thể cung cấp các thao tác cập nhật thông tin sinh viên, thêm điểm và tính GPA. Những phương thức này có thể cùng phục vụ việc quản lý một hồ sơ sinh viên. Ví dụ nằm trong [`student_cohesive.cpp`](src/srp/student_cohesive.cpp).
+Consider an OrderService that:
+1. validates an order;
+2. calculates the order total;
+3. writes the order to storage; and
+4. sends a confirmation email.
 
-Ngược lại, tạo `StudentNameGetter`, `StudentNameSetter`, `StudentAgeGetter` và `StudentAgeSetter` thành bốn lớp độc lập là chia nhỏ quá mức nếu chúng chỉ bọc các thao tác đọc/ghi đơn giản. Ví dụ [`over_split_student.cpp`](src/srp/over_split_student.cpp) minh họa cách tổ chức như vậy.
+These actions can change for different reasons:
 
-### 4.5. Chi phí của việc tạo quá nhiều lớp
+| Concern | Example change request |
+|---|---|
+| Validation | The business changes which orders are accepted |
+| Calculation | Shipping or discount rules change |
+| Persistence | The database schema or storage provider changes |
+| Notification | The email provider or message template changes |
 
-Tách lớp có thể giúp phân định trách nhiệm, nhưng cũng có chi phí:
+When all of these concerns are implemented in one class, the class becomes a point where unrelated changes accumulate. Its callers may also become exposed to implementation changes that they do not need to know about.
 
-- Người đọc phải di chuyển qua nhiều file để hiểu một quy trình nhỏ.
-- Số lượng constructor, dependency và object cần khởi tạo tăng lên.
-- Interface hoặc wrapper rỗng làm tăng tầng gián tiếp nhưng không mang lại khả năng thay thế có ý nghĩa.
-- Các lớp nhỏ có thể phụ thuộc chặt chẽ vào nhau, khiến tổng thể khó thay đổi hơn.
+### 2.2.4. How to recognize a class with unrelated responsibilities
 
-Do đó, cần cân nhắc **cohesion** (tính gắn kết) và **coupling** (mức độ phụ thuộc). Nhóm các hành vi có liên quan và thường thay đổi cùng nhau giúp thành phần có cohesion cao. Giảm các phụ thuộc không cần thiết giữa những thành phần thay đổi vì lý do khác nhau giúp hạn chế coupling. Mục tiêu không phải giảm số lớp bằng mọi giá mà là đặt ranh giới dễ hiểu.
+The following questions can reveal a possible SRP problem:
 
-## 5. Code Review — Đánh giá năm tình huống
+- Can different stakeholders request changes to different groups of methods?
+- Do some methods implement business policy while others handle storage, networking, or presentation?
+- Does changing one concern require retesting or modifying unrelated behavior?
+- Do the methods form distinct groups with little interaction?
+- Does the class depend on several unrelated technical systems?
+- Does its name hide multiple distinct responsibilities?
 
-### 5.1. Kiểm tra dữ liệu dùng chung (Shared validation)
+These are diagnostic signals, not automatic proof. A class with many methods is not necessarily poorly designed, and a class with few methods is not necessarily well designed. The actual responsibilities and likely change patterns matter more than the method count.
 
-**Đánh giá: nên dùng chung logic.**
+### 2.2.5. How responsibilities can be separated
 
-Hai thao tác kiểm tra khách hàng theo cùng một chính sách nghiệp vụ. Đây là cùng một kiến thức được sử dụng ở nhiều nơi, nên nên đưa điều kiện kiểm tra vào một hàm hoặc thành phần dùng chung.
+A class with multiple responsibilities can often be refactored into components with explicit roles:
 
-Điều kiện quan trọng là hai nơi thực sự cần cùng chính sách và cùng cách diễn giải kết quả. Nếu một nơi có quy tắc bổ sung riêng, phần riêng đó nên được thể hiện độc lập thay vì nhồi tất cả vào một hàm tổng quát với nhiều cờ boolean.
+- OrderValidator checks whether an order satisfies the rules.
+- OrderCalculator calculates the total.
+- OrderRepository stores the order.
+- ConfirmationSender sends the notification.
+- OrderService coordinates the workflow.
 
-### 5.2. Các phép tính tương tự (Similar calculations)
+The service may still call several methods, but its responsibility is now orchestration. It does not need to own the internal details of validation, calculation, persistence, or email delivery.
 
-**Đánh giá: có thể chấp nhận giữ riêng.**
+This separation can make each component easier to test or replace. However, it is useful only when the new boundaries represent meaningful responsibilities. Splitting code into classes that merely forward calls adds indirection without necessarily improving the design.
 
-Mô-đun thuế và mô-đun giảm giá cùng một công thức ở thời điểm hiện tại, nhưng xuất phát từ hai chính sách nghiệp vụ khác nhau. Nếu thuế và giảm giá có lịch thay đổi, người quyết định và yêu cầu kiểm thử riêng, hợp nhất chỉ vì phép tính giống nhau có thể tạo ra coupling không cần thiết.
+### 2.2.6. Example: refactoring an order service
 
-Nên giữ hai hàm với tên thể hiện rõ nghiệp vụ. Chỉ hợp nhất phần tính toán mức thấp nếu có một quy tắc chung thực sự, ổn định và abstraction không làm mất ranh giới chính sách.
+The repository compares:
 
-### 5.3. Lớp Student có nhiều phương thức
+- [order_service_before.cpp](src/srp/order_service_before.cpp), where validation, calculation, persistence, and notification are placed in one class.
+- [order_service_after.cpp](src/srp/order_service_after.cpp), where those responsibilities are assigned to separate collaborators and the service coordinates them.
 
-**Đánh giá: vấn đề tiềm ẩn, cần xem ranh giới trách nhiệm.**
+The refactored version makes it easier to change one concern independently. For example, a real repository implementation could replace the current output-only repository without rewriting the validation rules. Similarly, a different notification mechanism could replace the sender.
 
-Cập nhật thông tin sinh viên và lưu hồ sơ có thể thuộc cùng mô hình dữ liệu. Tính GPA và kiểm tra tình trạng học tập có thể thuộc nghiệp vụ học vụ. Hiển thị thông tin tổng hợp có thể thuộc tầng trình bày hoặc báo cáo.
+These examples simulate persistence and notification with console output. They demonstrate responsibility boundaries, not a functioning database or email integration.
 
-Nếu lớp `Student` vừa lưu trạng thái vừa chứa toàn bộ quy tắc học vụ và định dạng hiển thị, nó có nhiều lý do độc lập để thay đổi. Nên giữ dữ liệu và hành vi cốt lõi gắn với hồ sơ trong mô hình phù hợp, chuyển quy tắc học vụ sang thành phần nghiệp vụ và chuyển định dạng hiển thị sang lớp trình bày/báo cáo.
+**Design decision:** split the independent concerns, but keep an orchestration service because coordinating the order-placement process is itself a coherent responsibility.
 
-Không nên tách máy móc mọi phương thức: quyết định dựa trên việc các nhóm chức năng có thay đổi độc lập và có thể được kiểm thử riêng hay không.
+---
 
-### 5.4. Quá nhiều lớp getter/setter
+## 3. Advanced Analysis: Misuse, Over-Application, and Trade-Offs
 
-**Đánh giá: áp dụng SRP quá mức.**
+## 3.1. DRY: Is less duplicated code always better?
 
-Bốn lớp chỉ để đọc/ghi tên và tuổi thường không biểu diễn bốn trách nhiệm có ý nghĩa. Chúng làm tăng số lượng file và tầng gián tiếp nhưng không tạo ra sự độc lập thực sự.
+No. A smaller amount of repeated text does not automatically mean a better design. The important question is whether the repeated code expresses the same underlying knowledge.
 
-Các thao tác đọc/ghi có thể nằm trong lớp `Student` hoặc một kiểu dữ liệu hồ sơ phù hợp. Khi có quy tắc riêng phức tạp (ví dụ kiểm tra tính hợp lệ của tuổi hoặc quyền chỉnh sửa hồ sơ), khi đó mới cân nhắc tách thành phần theo trách nhiệm thật sự.
+Two code fragments may look alike for different reasons. A percentage calculation, for example, may be used by both a tax module and a customer-discount module. The arithmetic can be identical while the business policies are independent.
 
-### 5.5. Dịch vụ đơn hàng (Order service)
+### 3.1.1. Shared code can create unwanted dependencies
 
-**Đánh giá: nên xem xét tách các trách nhiệm.**
+A shared component is a dependency for every component that uses it. This is often desirable when the shared component represents a stable common rule. It can be harmful when it combines concerns that should evolve separately.
 
-Kiểm tra đơn hàng, tính tổng tiền, lưu dữ liệu và gửi email có những nguyên nhân thay đổi khác nhau. Tách các chức năng này giúp thay đổi một phần ít ảnh hưởng phần còn lại và dễ viết kiểm thử riêng.
+Potential problems include:
 
-Tuy nhiên, `OrderService` vẫn có thể tồn tại để điều phối thứ tự: xác thực, tính tổng, lưu đơn và gửi thông báo. Không cần tách lớp điều phối nếu nhiệm vụ duy nhất của nó là điều phối quy trình đặt hàng. Cách tổ chức minh họa trong `src/srp/order_service_after.cpp`.
+- **Change propagation:** a change to the shared abstraction can affect every caller.
+- **Release coordination:** independently evolving modules may become tied to one shared implementation.
+- **Conditional complexity:** a shared function may accumulate flags or branches to support callers with different needs.
+- **Semantic coupling:** two business concepts become connected because they currently use the same implementation.
+- **Reduced local clarity:** a reader must navigate to a generic component to understand a simple operation.
 
-## 6. Đánh giá và quyết định thiết kế
+Fowler explains that coupling is not something that can or should be eliminated completely. Modules must communicate to form a functioning system. The practical goal is to control unnecessary or harmful dependencies, particularly where a change in one component forces unrelated components to change [4].
 
-DRY và SRP nên được xem là nguyên tắc định hướng, không phải quy tắc cú pháp bắt buộc. Một thiết kế tốt không nhất thiết có ít dòng mã nhất hoặc nhiều lớp nhất. Nó cần làm rõ nơi lưu giữ kiến thức, lý do thay đổi và các phụ thuộc giữa thành phần.
+### 3.1.2. Premature abstraction
 
-Trước khi tái cấu trúc, có thể tự hỏi:
+**Premature abstraction** occurs when a developer creates a general-purpose interface or framework before the common behavior and its future requirements are understood well enough.
 
-1. Hai đoạn mã giống nhau có thực sự biểu diễn cùng một quy tắc hoặc cùng một ý định không?
-2. Khi yêu cầu thay đổi, các đoạn mã này có cần thay đổi cùng nhau không?
-3. Ai hoặc bộ phận nào sở hữu chính sách đó?
-4. Abstraction dự kiến có tên đơn giản và API dễ hiểu không?
-5. Tách lớp có làm giảm phụ thuộc, hay chỉ tạo thêm wrapper và chuyển tiếp phương thức?
-6. Có thể viết kiểm thử để xác nhận hành vi trước và sau tái cấu trúc không?
+A typical sequence is:
 
-Một thao tác refactoring đáng thực hiện khi lợi ích dài hạn — giảm rủi ro sai lệch, làm rõ ranh giới, giảm chi phí thay đổi hoặc giúp kiểm thử độc lập — lớn hơn chi phí tạo abstraction và bảo trì nó. Martin Fowler mô tả refactoring là thay đổi cấu trúc bên trong mà không làm thay đổi hành vi quan sát được; thực hiện qua những bước nhỏ giúp giảm rủi ro và dễ kiểm tra hơn [3].
+1. A developer sees two similar code fragments.
+2. The developer assumes they represent one stable concept.
+3. A generic interface or framework is designed.
+4. New parameters, flags, and branches are added as the use cases diverge.
+5. Callers become more difficult to understand than the original duplicated code.
 
-Một tình huống nên chủ động tránh áp dụng quá mức là hai mô-đun đang có cùng một công thức nhưng đại diện cho hai chính sách được quản lý độc lập. Trong trường hợp đó, giữ hai hàm riêng, đặt tên theo nghiệp vụ và viết kiểm thử riêng có thể dễ hiểu hơn tạo một hàm chung nhiều tham số. Tương tự, nếu một lớp hồ sơ sinh viên có một nhóm phương thức cùng quản lý dữ liệu và hành vi của hồ sơ, không cần tạo một lớp mới cho từng getter hoặc setter.
+This can be worse than keeping two small, explicit implementations. The abstraction may save a few lines but introduce several concepts that every maintainer must understand.
 
-### 6.1. Quy trình refactoring đề xuất
+### 3.1.3. Example of overusing DRY
 
-1. Ghi nhận hành vi hiện tại bằng kiểm thử hoặc ví dụ đầu vào/đầu ra.
-2. Xác định chính xác kiến thức hoặc trách nhiệm đang bị đặt sai chỗ.
-3. Thực hiện thay đổi nhỏ, không thay đổi hành vi quan sát được.
-4. Chạy lại kiểm thử và so sánh kết quả.
-5. Đánh giá xem cấu trúc mới có dễ đọc và dễ thay đổi hơn không.
-6. Dừng khi ranh giới đã rõ; không tiếp tục chia nhỏ chỉ để tăng số lớp hoặc giảm số dòng trùng.
+The file [premature_abstraction.cpp](src/dry/premature_abstraction.cpp) creates:
+- a PercentagePolicy interface;
+- separate tax and discount policy classes;
+- a generic PercentageEngine; and
+- a helper that connects the policy to the engine.
 
-## 7. Kết luận
+For this particular example, each policy only multiplies an amount by a fixed percentage. If the requirements are this small and the policies do not need runtime substitution, the abstraction is arguably more complicated than two clearly named calculations.
 
-DRY giúp tránh duy trì cùng một kiến thức ở nhiều nơi; SRP giúp đặt các hành vi có cùng lý do thay đổi vào một thành phần có trách nhiệm rõ ràng. Cả hai đều hướng đến khả năng bảo trì, nhưng áp dụng máy móc có thể tạo ra abstraction sớm, coupling không cần thiết hoặc quá nhiều lớp nhỏ.
+This does not mean that a policy interface is always wrong. It could be justified if policies are loaded dynamically, supplied by plugins, configured at runtime, or share a larger stable contract. The design is excessive only relative to the current requirements shown in this example.
 
-Quyết định thiết kế cần dựa trên ý nghĩa nghiệp vụ, nguyên nhân thay đổi, cohesion, coupling và chi phí bảo trì. Mã nguồn tốt không phải là mã không có bất kỳ sự lặp lại nào, cũng không phải chương trình được chia thành nhiều lớp nhất. Mã nguồn tốt là mã có cấu trúc giúp người phát triển hiểu đúng và thay đổi an toàn với độ phức tạp hợp lý.
+### 3.1.4. When duplication can be acceptable
 
-## 8. Tài liệu tham khảo
+Keeping similar code separate can be safer when:
+- the fragments represent different business policies;
+- the policies have different owners or approval processes;
+- they are expected to change independently;
+- a shared abstraction would need many flags or special cases;
+- the duplicated implementation is small and stable; or
+- the commonality is not yet understood well enough to name and model correctly.
 
-Chi tiết nguồn, liên kết và ngày truy cập được liệt kê trong [references.md](references.md).
+This is sometimes described informally as preferring a little duplication over the wrong abstraction. It should not become an excuse for careless copying. Separate implementations should have clear names, explicit ownership, and appropriate tests.
+
+### 3.1.5. Example: independent tax and discount policies
+
+In [independent_rules.cpp](src/dry/independent_rules.cpp), the tax calculator and loyalty-discount calculator both multiply an amount by 10 percent. The shared arithmetic is intentionally simple, but the two calculations represent separate business concepts.
+
+The tax rate may be determined by legal or regulatory requirements. A loyalty discount may be determined by a commercial policy. A change to one does not necessarily imply a change to the other.
+
+Keeping the methods separate makes their meaning explicit and prevents a shared business-policy abstraction from implying that the rates must evolve together. If a stable lower-level arithmetic utility later becomes valuable, it can be introduced without merging the policy ownership.
+
+**Trade-off:** a few repeated arithmetic characters are acceptable when they preserve the independence of two business rules. The decision should be revisited if the policies later become genuinely governed by one shared rule.
+
+## 3.2. SRP: Does every responsibility require its own class?
+
+No. SRP does not mean one class must contain only one method. A class can have several methods and still have one clear responsibility if those methods support the same coherent concept and tend to change together.
+
+### 3.2.1. A class can have many methods and one responsibility
+
+Consider a StudentRecord class with methods to:
+- update the student's name;
+- add a grade;
+- calculate the average grade; and
+- determine academic standing.
+
+All of these methods relate to maintaining and interpreting a student's academic record. They can reasonably belong together.
+
+The relevant question is not "How many methods are in this class?" It is "Do these methods serve the same responsibility, or are they affected by unrelated change requests?"
+
+### 3.2.2. Problems caused by too many small classes
+
+Over-applying SRP may create one class for every getter, setter, or tiny operation. This can produce:
+
+- **Excessive indirection:** a simple operation requires navigating through several files and objects.
+- **More dependencies:** callers must construct or inject many objects for one small task.
+- **Poor discoverability:** related behavior is scattered across a large number of names.
+- **Boilerplate:** constructors, interfaces, wrappers, and forwarding methods add code without meaningful behavior.
+- **False separation:** classes that cannot realistically change or operate independently are treated as if they were independent components.
+
+A large number of classes is not automatically a sign of good modularity. A useful class boundary should represent a meaningful responsibility.
+
+### 3.2.3. Interfaces and wrappers are not free
+
+Interfaces, adapters, wrappers, and intermediate layers are valuable when they provide a real benefit, such as substitutability, dependency inversion, isolation from an external system, or a stable contract.
+
+They are not automatically beneficial when used only to move a one-line getter into another file. Every layer introduces a concept and often a dependency. The benefit of an abstraction should be greater than the mental and maintenance cost it adds.
+
+### 3.2.4. Cohesion and coupling
+
+Two useful design concepts help evaluate whether a class should be split:
+
+**Cohesion** describes how strongly the responsibilities and operations inside a module belong together. A highly cohesive component has a clear purpose; its methods contribute to that purpose. A component that combines unrelated tasks has weaker cohesion.
+
+**Coupling** describes dependencies between components. Some coupling is necessary: components must collaborate to form a system. The concern is unnecessary or fragile coupling, where a change in one component forces changes in others without a strong domain reason.
+
+A useful design often aims for:
+- high cohesion within a component;
+- controlled dependencies between components;
+- explicit interfaces where they provide a real boundary; and
+- no artificial separation that makes normal collaboration harder.
+
+Fowler's discussion of coupling emphasizes that dependency is not inherently bad. The pattern and consequences of dependencies matter [4].
+
+### 3.2.5. Example: grouping student-record functions
+
+[student_cohesive.cpp](src/srp/student_cohesive.cpp) groups student-record operations in one class. The class manages the record's name and grades and derives the average and academic standing from that information.
+
+The example deliberately keeps console presentation in main() rather than making the record class responsible for formatting and printing a report. This illustrates a useful boundary: domain data and behavior can stay together, while presentation can remain outside the domain model.
+
+The class has several methods, but they contribute to one coherent responsibility. Splitting it into a separate class for each method would make the design harder to follow without providing a meaningful independent change boundary.
+
+### 3.2.6. Example: excessive SRP decomposition
+
+[over_split_student.cpp](src/srp/over_split_student.cpp) defines separate classes for:
+- reading the student's name;
+- setting the student's name;
+- reading the student's age; and
+- setting the student's age.
+
+In the shown context, these classes only wrap basic field access. They do not own independent policies or complex behavior. A single Student or StudentRecord type would be clearer.
+
+If age changes later require validation, authorization, or audit logging, those behaviors may justify a meaningful operation or policy. They do not automatically justify one class for every read and write operation.
+
+**Trade-off:** keep related record operations together until there is a real reason for separate ownership, independent variation, or isolation.
+
+---
+
+## 4. Personal Design Evaluation and Decision-Making
+
+### 4.1. Are DRY and SRP mandatory rules or guiding principles?
+
+They are **guiding design principles**, not rules that should be followed blindly.
+
+Their purpose is to help developers reason about maintainability. The principles do not know the complete context of a particular system. A developer must still consider domain meaning, likely change, team ownership, technical constraints, testing, and the cost of introducing abstractions.
+
+A literal interpretation can be harmful:
+- "Never repeat code" can lead to abstractions that unite unrelated policies.
+- "One responsibility per class" can lead to a class for every method.
+- "No coupling" would prevent components from collaborating at all.
+
+A better interpretation is to avoid duplicated knowledge and unrelated reasons to change while keeping the design understandable.
+
+### 4.2. How to decide whether refactoring is worthwhile
+
+Refactoring is worthwhile when it improves the internal design enough to justify the change and its future maintenance cost.
+
+Martin Fowler defines refactoring as changing the internal structure of software to make it easier to understand and cheaper to modify without changing its observable behavior [3]. His description emphasizes a sequence of small, behavior-preserving transformations rather than a large, risky rewrite.
+
+Before refactoring, consider:
+
+| Factor | Questions to ask |
+|---|---|
+| Meaning | Do the fragments represent the same knowledge or only similar syntax? |
+| Change pattern | Are the parts likely to change for the same reason? |
+| Ownership | Are they governed by the same business policy or stakeholder? |
+| Stability | Is the common behavior understood and stable, or still evolving? |
+| Abstraction cost | Will the new API be simpler than the duplicated code? |
+| Coupling | Will sharing the code connect previously independent modules? |
+| Testability | Can behavior be checked before and after the refactoring? |
+| Scale | Is the problem frequent or important enough to justify the new structure? |
+| Team comprehension | Will another developer understand where to make the next change? |
+
+A refactoring should have a concrete expected benefit, such as removing inconsistent policy copies, isolating an external integration, or making a module easier to test. Refactoring solely to make a diagram look more object-oriented is not a sufficient reason.
+
+### 4.3. What to consider before extracting shared code
+
+Before extracting a common function or module:
+
+1. Confirm that the fragments have the same semantic purpose.
+2. Identify whether they must obey the same policy over time.
+3. Compare their edge cases and error behavior.
+4. Give the shared concept a meaningful name.
+5. Check whether the abstraction needs many flags or special cases.
+6. Consider whether callers should depend on the shared component.
+7. Keep independent policy decisions outside the shared implementation.
+8. Add tests that express the common contract.
+
+A good shared abstraction represents a real commonality. It should not force separate business concepts into one interface merely because they currently use the same expression.
+
+### 4.4. What to consider before splitting a class
+
+Before dividing a class:
+
+1. Identify the different groups of behavior.
+2. Determine what kinds of requests can cause each group to change.
+3. Check whether the groups share state and invariants.
+4. Assess whether the proposed classes can be understood and tested independently.
+5. Examine the dependencies that the split will create.
+6. Avoid classes that only forward calls without adding a clear responsibility.
+7. Keep the resulting design navigable and understandable.
+
+A class should be split when the new components have meaningful purposes and the separation reduces the impact of independent changes. A class should not be split merely because it contains multiple methods.
+
+### 4.5. A situation in which I would deliberately avoid over-applying DRY or SRP
+
+I would keep two simple calculations separate if they currently use the same formula but represent independent business rules—for example, tax and loyalty discount rates.
+
+The reason is that the policies have different sources of change. A tax regulation can change without any reason for the loyalty program to change. A shared policy object could introduce a false relationship between them. In this situation, separate functions with domain-specific names are easier to understand and safer to evolve.
+
+Likewise, I would not create four classes for reading and writing a student's name and age. Those operations are simple parts of one student-record concept. A single cohesive class provides a clearer place to find and maintain them.
+
+These are deliberate decisions, not an argument against DRY or SRP. They apply the principles according to the meaning and expected evolution of the software.
+
+---
+
+## 5. Code Review: Evaluation of the Five Scenarios
+
+The assignment asks whether each situation is a violation, a potential problem, or acceptable. The decisions below are based on the context given. Where the scenario does not provide enough implementation detail, the conclusion is conditional rather than absolute.
+
+### 5.1. Shared validation
+
+**Scenario:** Two operations contain the same customer-validation logic and follow the same business policy.
+
+**Decision: Share the validation logic.**
+
+This is a strong DRY candidate because the two implementations represent the same knowledge. If the policy changes, both operations should follow the new rule. A single validation function or policy component reduces the risk that one operation becomes inconsistent with the other.
+
+The common component should express the shared rule clearly. If one operation has additional requirements, those should remain explicit rather than being hidden behind a large collection of boolean flags.
+
+**Classification:** duplicated knowledge worth consolidating.
+
+### 5.2. Similar calculations
+
+**Scenario:** A tax module and a discount module currently contain the same formula, but their rules come from different business policies.
+
+**Decision: Keep the policies separate unless a genuine shared rule is established.**
+
+The same arithmetic does not prove the same business meaning. Tax and discount policies can have different legal, commercial, approval, and testing requirements. A future change to tax should not automatically affect a loyalty discount.
+
+The modules may use a low-level mathematical utility if that utility is truly independent of the business policies. However, their policy definitions and domain-specific tests should remain separate.
+
+**Classification:** acceptable duplication when it preserves independent business rules.
+
+### 5.3. A Student class with many methods
+
+**Scenario:** A Student class updates student information, calculates GPA, checks academic standing, and displays a summary.
+
+**Decision: Potential SRP issue; inspect the responsibility behind each method.**
+
+The number of methods is not the deciding factor. Updating a student's record, adding grades, and calculating values derived from those grades may form a cohesive student-record responsibility.
+
+However, academic policy and presentation can have different reasons to change. GPA rules may be controlled by academic regulations, while summary formatting may be requested by a user-interface or reporting stakeholder. If the class directly handles all formatting and output as well as maintaining the record, it may have multiple responsibilities.
+
+A reasonable design is to keep the student data and closely related behavior together, put independent academic policies in a suitable domain service when necessary, and let a presentation or reporting component format the summary.
+
+**Classification:** potential SRP violation, depending on whether the methods belong to one cohesive responsibility.
+
+### 5.4. Too many classes
+
+**Scenario:** A developer creates StudentNameGetter, StudentNameSetter, StudentAgeGetter, and StudentAgeSetter.
+
+**Decision: This is excessive decomposition in the described context.**
+
+Each class wraps one elementary read or write operation. No meaningful independent policy, ownership, or variation is described. The separation increases the number of objects and files that must be understood without providing a clear benefit.
+
+A student-record class can expose appropriate accessors and update operations. If a particular field later gains complex validation or authorization rules, that behavior can be modeled at the point where the policy genuinely belongs.
+
+**Classification:** over-application of SRP.
+
+### 5.5. Order service
+
+**Scenario:** An OrderService validates an order, calculates the total, saves the order, and sends a confirmation email.
+
+**Decision: Separate the independent concerns, while retaining orchestration if useful.**
+
+Validation, pricing, persistence, and notification are likely to change for different reasons. Assigning them to separate components allows each to be tested and modified without embedding all implementation details in one service.
+
+The service may remain as an orchestrator. Its responsibility is to coordinate the order-placement workflow and ensure that the steps occur in the correct order. It should not need to know how a database stores an order or how an email provider sends a message.
+
+In a very small application, a separate class for every operation may be unnecessary. The decision should depend on the complexity, likely change, and need to replace or test each concern independently.
+
+**Classification:** likely multiple responsibilities; separation is justified when the boundaries represent real change axes.
+
+### 5.6. Summary decision table
+
+| # | Scenario | Assessment | Recommended action |
+|---|---|---|---|
+| 1 | Shared customer validation | Duplicated knowledge | Extract one shared policy or function |
+| 2 | Similar tax and discount calculations | Independent business rules | Keep policies separate; share only truly common low-level behavior |
+| 3 | Student with several methods | Potential SRP problem | Group record behavior; separate independent academic-policy or presentation concerns |
+| 4 | Separate getter/setter classes | Excessive decomposition | Use a cohesive student-record type |
+| 5 | Multi-purpose order service | Likely multiple reasons to change | Separate validator, calculator, repository, and sender; keep orchestration if it has a clear purpose |
+
+---
+
+## 6. A Practical Decision Framework
+
+The following framework turns the principles into a repeatable code-review process.
+
+### 6.1. When considering DRY
+
+Ask:
+
+1. Is the repeated fragment the representation of one shared fact, rule, or policy?
+2. Would a change to that knowledge need to update all copies together?
+3. Does a shared abstraction have a clear name and stable contract?
+4. Would the abstraction create a dependency between concepts that should vary independently?
+5. Is the cost of maintaining the copies greater than the cost of maintaining the abstraction?
+
+If the first two answers are yes and the abstraction is simple, sharing is likely useful. If the fragments only look alike and their policies change independently, keeping them separate may be safer.
+
+### 6.2. When considering SRP
+
+Ask:
+
+1. What responsibility does the component represent?
+2. Which stakeholder, policy, or technical concern can request a change?
+3. Do groups of methods change for different reasons?
+4. Do the methods share important state or invariants?
+5. Would splitting the component improve cohesion and reduce harmful coupling?
+6. Would the split add more indirection than value?
+
+A useful split creates components that can be understood and changed for distinct reasons. A useless split creates small wrappers with no independent meaning.
+
+### 6.3. Safe refactoring sequence
+
+A practical refactoring sequence is:
+
+1. **Observe current behavior.** Write tests or record representative input/output cases.
+2. **Identify the design issue.** State which knowledge is duplicated or which responsibilities are mixed.
+3. **Make one small structural change.** Avoid combining several unrelated refactorings.
+4. **Run tests.** Confirm that externally visible behavior remains the same.
+5. **Review dependencies.** Check whether the new abstraction creates coupling or unnecessary indirection.
+6. **Evaluate readability.** Ask whether another developer can more easily locate the next change.
+7. **Stop when the design is clear enough.** Do not continue splitting or generalizing without a concrete benefit.
+
+This sequence follows the behavior-preserving approach to refactoring described by Fowler [3].
+
+---
+
+## 7. Conclusion
+
+DRY and SRP address different but related design problems. DRY discourages maintaining the same knowledge in several places. SRP encourages grouping behavior according to coherent responsibilities and reasons to change. Both can improve maintainability when their underlying concepts are understood.
+
+However, neither principle should be interpreted literally as a demand to eliminate every repeated expression or to create one class for every method. Superficially similar code may implement independent policies. A class may contain many methods that all support one responsibility. Shared abstractions can introduce dependencies, and excessive class decomposition can make code harder to navigate.
+
+The examples and code-review scenarios demonstrate that good design requires judgment. Developers should consider semantic meaning, policy ownership, expected change, cohesion, coupling, testability, and the cost of abstraction. A little duplication can be safer than an incorrect abstraction, and a cohesive class can be clearer than many tiny classes.
+
+The most useful objective is not minimum duplication or maximum decomposition. It is a codebase that is understandable, testable, and reasonably easy to change without introducing unnecessary complexity.
+
+---
+
+## 8. References
+
+The bibliography, publication details, access dates, and the role of each source are provided in [references.md](references.md).
