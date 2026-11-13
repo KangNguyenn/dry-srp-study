@@ -15,6 +15,10 @@ public:
         }
     }
 
+    const std::string& name() const {
+        return name_;
+    }
+
     void addGrade(double grade) {
         if (grade >= 0.0 && grade <= 10.0) {
             grades_.push_back(grade);
@@ -50,7 +54,7 @@ int main() {
     student.addGrade(7.5);
     student.addGrade(9.0);
 
-    std::cout << "Student: An\n";
+    std::cout << "Student: " << student.name() << std::endl;
     std::cout << "Average: " << student.gpa() << '\n';
     std::cout << "Standing: " << student.academicStanding() << '\n';
 }
