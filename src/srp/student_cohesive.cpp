@@ -1,4 +1,3 @@
-#include <iomanip>
 #include <iostream>
 #include <numeric>
 #include <string>
@@ -40,13 +39,6 @@ public:
         return gpa() >= 5.0 ? "Pass" : "Needs improvement";
     }
 
-    void printSummary() const {
-        std::cout << "Student: " << name_ << '\n';
-        std::cout << "Average: " << std::fixed << std::setprecision(2)
-                  << gpa() << '\n';
-        std::cout << "Standing: " << academicStanding() << '\n';
-    }
-
 private:
     std::string name_;
     std::vector<double> grades_;
@@ -57,5 +49,8 @@ int main() {
     student.addGrade(8.0);
     student.addGrade(7.5);
     student.addGrade(9.0);
-    student.printSummary();
+
+    std::cout << "Student: An\n";
+    std::cout << "Average: " << student.gpa() << '\n';
+    std::cout << "Standing: " << student.academicStanding() << '\n';
 }
