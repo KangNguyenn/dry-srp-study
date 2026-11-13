@@ -1,0 +1,3 @@
+LaTeX report build instructions
+
+Run make in this directory. The document uses pdfLaTeX, BibLaTeX, and Biber.
