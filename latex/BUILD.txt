@@ -2,7 +2,8 @@ LaTeX report build instructions
 ================================
 
 Requirements:
-- TeX Live with LaTeX base, recommended, and extra packages
+- TeX Live with XeLaTeX, LaTeX base/recommended/extra packages
+- DejaVu fonts
 - BibLaTeX and Biber
 - GNU Make (optional, but recommended)
 
@@ -10,14 +11,15 @@ Build the PDF:
   cd latex
   make
 
-The Makefile runs pdfLaTeX, Biber, and pdfLaTeX twice more to resolve
-citations, bibliography entries, cross-references, and the table of contents.
+The Makefile runs XeLaTeX, Biber, and XeLaTeX twice more to resolve
+Unicode text, citations, bibliography entries, cross-references, and
+the table of contents.
 
 Equivalent commands:
-  pdflatex -interaction=nonstopmode -halt-on-error report.tex
+  xelatex -interaction=nonstopmode -halt-on-error report.tex
   biber report
-  pdflatex -interaction=nonstopmode -halt-on-error report.tex
-  pdflatex -interaction=nonstopmode -halt-on-error report.tex
+  xelatex -interaction=nonstopmode -halt-on-error report.tex
+  xelatex -interaction=nonstopmode -halt-on-error report.tex
 
 The bibliography is managed by BibLaTeX and Biber. All cited works are
 defined in references.bib and rendered by the bibliography command in
