@@ -1,4 +1,4 @@
-LATEX=pdflatex
+LATEX=xelatex
 BIBER=biber
 
 .PHONY: all clean
