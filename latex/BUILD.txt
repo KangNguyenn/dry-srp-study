@@ -1,3 +1,30 @@
 LaTeX report build instructions
+================================
 
-Run make in this directory. The document uses pdfLaTeX, BibLaTeX, and Biber.
+Requirements:
+- TeX Live with LaTeX base, recommended, and extra packages
+- BibLaTeX and Biber
+- GNU Make (optional, but recommended)
+
+Build the PDF:
+  cd latex
+  make
+
+The Makefile runs pdfLaTeX, Biber, and pdfLaTeX twice more to resolve
+citations, bibliography entries, cross-references, and the table of contents.
+
+Equivalent commands:
+  pdflatex -interaction=nonstopmode -halt-on-error report.tex
+  biber report
+  pdflatex -interaction=nonstopmode -halt-on-error report.tex
+  pdflatex -interaction=nonstopmode -halt-on-error report.tex
+
+The bibliography is managed by BibLaTeX and Biber. All cited works are
+defined in references.bib and rendered by the bibliography command in
+report.tex. Do not run BibTeX for this document.
+
+The appendices load the C++ examples from ../src. Keep that directory
+structure when compiling.
+
+The generated PDF is latex/report.pdf. Remove auxiliary files with:
+  make clean
